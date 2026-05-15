@@ -251,7 +251,7 @@ enum CostUsageScanner {
         case .openai, .zai, .gemini, .antigravity, .cursor, .opencode, .opencodego, .alibaba, .factory, .copilot,
              .minimax, .manus, .kilo, .kiro, .kimi, .kimik2, .moonshot, .augment, .jetbrains, .amp, .ollama,
              .synthetic, .openrouter, .warp, .perplexity, .mimo, .doubao, .abacus, .mistral, .deepseek, .codebuff,
-             .crof, .windsurf, .venice, .commandcode, .stepfun, .bedrock:
+             .crof, .windsurf, .venice, .commandcode, .stepfun, .bedrock, .devin:
             return emptyReport
         }
     }
