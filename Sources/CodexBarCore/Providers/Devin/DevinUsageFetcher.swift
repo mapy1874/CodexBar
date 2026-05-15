@@ -132,16 +132,64 @@ public enum DevinUsageError: LocalizedError, Sendable {
     }
 }
 
+// MARK: - v3 API Response Models
+
+public struct DevinV3SelfResponse: Codable, Sendable, Equatable {
+    public let principal_type: String
+    public let service_user_id: String?
+    public let service_user_name: String?
+    public let org_id: String?
+}
+
+public struct DevinV3SessionsResponse: Codable, Sendable {
+    public let items: [DevinV3Session]
+    public let total: Int
+    public let has_next_page: Bool
+    public let end_cursor: String?
+}
+
+public struct DevinV3Session: Codable, Sendable {
+    public let session_id: String
+    public let status: String
+    public let acus_consumed: Double
+    public let pull_requests: [DevinV3PullRequest]?
+    public let org_id: String?
+}
+
+public struct DevinV3PullRequest: Codable, Sendable {
+    public let pr_url: String
+    public let pr_state: String?
+}
+
 // MARK: - Fetcher
 
 public struct DevinUsageFetcher: Sendable {
     private static let log = CodexBarLog.logger(LogCategories.devinUsage)
     private static let baseURL = "https://api.devin.ai"
+
+    // v2 enterprise endpoints
     private static let cyclesURL = URL(string: "\(baseURL)/v2/enterprise/consumption/cycles")!
     private static let dailyURL = URL(string: "\(baseURL)/v2/enterprise/consumption/daily")!
     private static let metricsURL = URL(string: "\(baseURL)/v2/enterprise/metrics/usage")!
 
+    // v3 endpoints
+    private static let selfURL = URL(string: "\(baseURL)/v3/self")!
+
+    /// Fetches usage, auto-detecting v2 (apk_user_*) vs v3 (cog_*) key format.
     public static func fetchUsage(
+        apiKey: String,
+        timeout: TimeInterval = 15,
+        session: URLSession = .shared) async throws -> DevinUsageSnapshot
+    {
+        if apiKey.hasPrefix("cog_") {
+            return try await self.fetchUsageV3(apiKey: apiKey, timeout: timeout, session: session)
+        }
+        return try await self.fetchUsageV2(apiKey: apiKey, timeout: timeout, session: session)
+    }
+
+    // MARK: - v2 Enterprise Flow
+
+    static func fetchUsageV2(
         apiKey: String,
         timeout: TimeInterval = 15,
         session: URLSession = .shared) async throws -> DevinUsageSnapshot
@@ -184,7 +232,121 @@ public struct DevinUsageFetcher: Sendable {
             updatedAt: Date())
     }
 
-    // MARK: - API Calls
+    // MARK: - v3 Service User Flow
+
+    static func fetchUsageV3(
+        apiKey: String,
+        timeout: TimeInterval = 15,
+        session: URLSession = .shared) async throws -> DevinUsageSnapshot
+    {
+        let selfInfo = try await self.fetchSelf(apiKey: apiKey, timeout: timeout, session: session)
+        guard let orgID = selfInfo.org_id else {
+            throw DevinUsageError.apiError(403, "Service user has no org_id. Use an org-scoped service user key.")
+        }
+
+        let sessions = try await self.fetchAllSessions(
+            apiKey: apiKey,
+            orgID: orgID,
+            timeout: timeout,
+            session: session)
+
+        let totalACUs = sessions.reduce(0.0) { $0 + $1.acus_consumed }
+        let allPRs = sessions.flatMap { $0.pull_requests ?? [] }
+        let mergedPRs = allPRs.filter { $0.pr_state == "merged" }.count
+        let openedPRs = allPRs.count
+
+        return DevinUsageSnapshot(
+            totalACUs: totalACUs,
+            cycleStart: nil,
+            cycleEnd: nil,
+            sessionsCount: sessions.count,
+            prsOpened: openedPRs,
+            prsMerged: mergedPRs,
+            updatedAt: Date())
+    }
+
+    // MARK: - v3 API Calls
+
+    static func fetchSelf(
+        apiKey: String,
+        timeout: TimeInterval = 15,
+        session: URLSession = .shared) async throws -> DevinV3SelfResponse
+    {
+        var request = URLRequest(url: self.selfURL)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = timeout
+
+        let (data, response) = try await self.performRequest(request, session: session)
+        try Self.validateResponse(response, data: data)
+
+        do {
+            return try JSONDecoder().decode(DevinV3SelfResponse.self, from: data)
+        } catch {
+            throw DevinUsageError.parseFailed("self: \(error.localizedDescription)")
+        }
+    }
+
+    static func fetchAllSessions(
+        apiKey: String,
+        orgID: String,
+        timeout: TimeInterval = 15,
+        session: URLSession = .shared) async throws -> [DevinV3Session]
+    {
+        var allSessions: [DevinV3Session] = []
+        var cursor: String?
+
+        while true {
+            let page = try await self.fetchSessionsPage(
+                apiKey: apiKey,
+                orgID: orgID,
+                cursor: cursor,
+                timeout: timeout,
+                session: session)
+            allSessions.append(contentsOf: page.items)
+            if !page.has_next_page { break }
+            cursor = page.end_cursor
+        }
+
+        return allSessions
+    }
+
+    static func fetchSessionsPage(
+        apiKey: String,
+        orgID: String,
+        cursor: String?,
+        timeout: TimeInterval = 15,
+        session: URLSession = .shared) async throws -> DevinV3SessionsResponse
+    {
+        let sessionsURL = URL(string: "\(self.baseURL)/v3/organizations/\(orgID)/sessions")!
+        var components = URLComponents(url: sessionsURL, resolvingAgainstBaseURL: false)!
+        var queryItems = [URLQueryItem(name: "first", value: "200")]
+        if let cursor {
+            queryItems.append(URLQueryItem(name: "after", value: cursor))
+        }
+        components.queryItems = queryItems
+        guard let url = components.url else {
+            throw DevinUsageError.parseFailed("Invalid sessions URL")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = timeout
+
+        let (data, response) = try await self.performRequest(request, session: session)
+        try Self.validateResponse(response, data: data)
+
+        do {
+            return try JSONDecoder().decode(DevinV3SessionsResponse.self, from: data)
+        } catch {
+            throw DevinUsageError.parseFailed("sessions: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - v2 API Calls
 
     static func fetchCycles(
         apiKey: String,
@@ -322,5 +484,13 @@ public struct DevinUsageFetcher: Sendable {
 
     public static func _parseMetricsForTesting(_ data: Data) throws -> DevinUsageMetrics {
         try JSONDecoder().decode(DevinUsageMetrics.self, from: data)
+    }
+
+    public static func _parseSelfForTesting(_ data: Data) throws -> DevinV3SelfResponse {
+        try JSONDecoder().decode(DevinV3SelfResponse.self, from: data)
+    }
+
+    public static func _parseSessionsForTesting(_ data: Data) throws -> DevinV3SessionsResponse {
+        try JSONDecoder().decode(DevinV3SessionsResponse.self, from: data)
     }
 }

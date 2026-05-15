@@ -156,6 +156,94 @@ struct DevinProviderLinuxTests {
         #expect(ProviderTokenResolver.devinToken(environment: [:]) == nil)
     }
 
+    // MARK: - v3 Self Parsing
+
+    @Test
+    func `parses v3 self response`() throws {
+        let json = """
+        {
+          "principal_type": "service_user",
+          "service_user_id": "service-user-abc123",
+          "service_user_name": "Test Bot",
+          "org_id": "org_XYZ"
+        }
+        """
+        let selfInfo = try DevinUsageFetcher._parseSelfForTesting(Data(json.utf8))
+        #expect(selfInfo.principal_type == "service_user")
+        #expect(selfInfo.org_id == "org_XYZ")
+        #expect(selfInfo.service_user_name == "Test Bot")
+    }
+
+    @Test
+    func `parses v3 self response without org_id`() throws {
+        let json = """
+        {
+          "principal_type": "service_user",
+          "service_user_id": "service-user-abc123",
+          "service_user_name": "Enterprise Bot",
+          "org_id": null
+        }
+        """
+        let selfInfo = try DevinUsageFetcher._parseSelfForTesting(Data(json.utf8))
+        #expect(selfInfo.org_id == nil)
+    }
+
+    // MARK: - v3 Sessions Parsing
+
+    @Test
+    func `parses v3 sessions response`() throws {
+        let json = """
+        {
+          "items": [
+            {
+              "session_id": "abc123",
+              "status": "finished",
+              "acus_consumed": 5.5,
+              "pull_requests": [
+                {"pr_url": "https://github.com/org/repo/pull/1", "pr_state": "merged"},
+                {"pr_url": "https://github.com/org/repo/pull/2", "pr_state": "open"}
+              ],
+              "org_id": "org_XYZ"
+            },
+            {
+              "session_id": "def456",
+              "status": "running",
+              "acus_consumed": 2.0,
+              "pull_requests": [],
+              "org_id": "org_XYZ"
+            }
+          ],
+          "total": 10,
+          "has_next_page": true,
+          "end_cursor": "cursor123"
+        }
+        """
+        let response = try DevinUsageFetcher._parseSessionsForTesting(Data(json.utf8))
+        #expect(response.items.count == 2)
+        #expect(response.total == 10)
+        #expect(response.has_next_page == true)
+        #expect(response.end_cursor == "cursor123")
+        #expect(response.items[0].acus_consumed == 5.5)
+        #expect(response.items[0].pull_requests?.count == 2)
+        #expect(response.items[1].acus_consumed == 2.0)
+    }
+
+    @Test
+    func `parses v3 sessions with empty items`() throws {
+        let json = """
+        {
+          "items": [],
+          "total": 0,
+          "has_next_page": false,
+          "end_cursor": null
+        }
+        """
+        let response = try DevinUsageFetcher._parseSessionsForTesting(Data(json.utf8))
+        #expect(response.items.isEmpty)
+        #expect(response.total == 0)
+        #expect(response.has_next_page == false)
+    }
+
     // MARK: - Provider Descriptor
 
     @Test
