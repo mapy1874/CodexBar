@@ -23,6 +23,13 @@ extension TokenAccountSupportCatalog {
             injection: .environment(key: DeepSeekSettingsReader.apiKeyEnvironmentKey),
             requiresManualCookieSource: false,
             cookieName: nil),
+        .devin: TokenAccountSupport(
+            title: "API keys",
+            subtitle: "Store multiple Devin API keys.",
+            placeholder: "cog_… or apk_user_…",
+            injection: .environment(key: DevinSettingsReader.apiKeyEnvironmentKey),
+            requiresManualCookieSource: false,
+            cookieName: nil),
         .antigravity: TokenAccountSupport(
             title: "Google accounts",
             subtitle: "Store multiple Antigravity Google OAuth accounts for quick switching.",

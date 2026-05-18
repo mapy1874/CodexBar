@@ -252,6 +252,23 @@ struct DevinUsageFetcherTests {
         #expect(token == nil)
     }
 
+    @Test
+    func `token account catalog supports Devin API keys`() {
+        let support = TokenAccountSupportCatalog.support(for: .devin)
+        #expect(support?.title == "API keys")
+        #expect(support?.requiresManualCookieSource == false)
+        #expect(support?.cookieName == nil)
+
+        if case let .environment(key) = support?.injection {
+            #expect(key == DevinSettingsReader.apiKeyEnvironmentKey)
+        } else {
+            Issue.record("Expected Devin token accounts to inject an environment variable")
+        }
+
+        let override = TokenAccountSupportCatalog.envOverride(for: .devin, token: "cog_test")
+        #expect(override?[DevinSettingsReader.apiKeyEnvironmentKey] == "cog_test")
+    }
+
     // MARK: - Provider Descriptor
 
     @Test

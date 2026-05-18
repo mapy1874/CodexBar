@@ -1199,6 +1199,7 @@ struct SettingsStoreTests {
             .commandcode,
             .stepfun,
             .bedrock,
+            .devin,
         ])
 
         // Move one provider; ensure it's persisted across instances.

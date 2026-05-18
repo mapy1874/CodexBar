@@ -1,8 +1,9 @@
 import Foundation
 
 public struct DevinSettingsReader: Sendable {
+    public static let apiKeyEnvironmentKey = "DEVIN_API_KEY"
     public static let apiKeyEnvironmentKeys = [
-        "DEVIN_API_KEY",
+        apiKeyEnvironmentKey,
         "DEVIN_TOKEN",
     ]
 

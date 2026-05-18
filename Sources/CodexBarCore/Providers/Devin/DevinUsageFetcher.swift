@@ -78,7 +78,7 @@ public struct DevinUsageSnapshot: Sendable {
 
         var secondaryDescription: String?
         if let sessions = self.sessionsCount {
-            var parts: [String] = ["\(sessions) sessions"]
+            var parts = ["\(sessions) sessions"]
             if let prs = self.prsMerged, prs > 0 {
                 parts.append("\(prs) PRs merged")
             }
@@ -119,7 +119,10 @@ public enum DevinUsageError: LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .missingCredentials:
-            "Missing Devin API key. Set DEVIN_API_KEY or DEVIN_TOKEN, or add a token account in Settings → Providers → Devin."
+            """
+            Missing Devin API key. Set DEVIN_API_KEY or DEVIN_TOKEN, or add a token account in \
+            Settings → Providers → Devin.
+            """
         case let .networkError(message):
             "Devin network error: \(message)"
         case let .apiError(code, message):
@@ -172,7 +175,7 @@ public struct DevinUsageFetcher: Sendable {
     private static let dailyURL = URL(string: "\(baseURL)/v2/enterprise/consumption/daily")!
     private static let metricsURL = URL(string: "\(baseURL)/v2/enterprise/metrics/usage")!
 
-    // v3 endpoints
+    /// v3 endpoints
     private static let selfURL = URL(string: "\(baseURL)/v3/self")!
 
     /// Fetches usage, auto-detecting v2 (apk_user_*) vs v3 (cog_*) key format.
@@ -252,7 +255,7 @@ public struct DevinUsageFetcher: Sendable {
 
         let totalACUs = sessions.reduce(0.0) { $0 + $1.acus_consumed }
         let allPRs = sessions.flatMap { $0.pull_requests ?? [] }
-        let mergedPRs = allPRs.filter { $0.pr_state == "merged" }.count
+        let mergedPRs = allPRs.count(where: { $0.pr_state == "merged" })
         let openedPRs = allPRs.count
 
         return DevinUsageSnapshot(
@@ -450,7 +453,7 @@ public struct DevinUsageFetcher: Sendable {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw DevinUsageError.networkError("Non-HTTP response")
         }
-        guard (200 ... 299).contains(httpResponse.statusCode) else {
+        guard (200...299).contains(httpResponse.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? "(non-UTF-8)"
             throw DevinUsageError.apiError(httpResponse.statusCode, body)
         }
