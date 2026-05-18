@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Testing
+@testable import CodexBar
 
 @MainActor
 struct ProviderIconResourcesTests {
@@ -26,6 +27,7 @@ struct ProviderIconResourcesTests {
             "commandcode",
             "kimi",
             "bedrock",
+            "devin",
         ]
         for slug in slugs {
             let url = resources.appending(path: "ProviderIcon-\(slug).svg")
@@ -36,6 +38,11 @@ struct ProviderIconResourcesTests {
             let image = NSImage(contentsOf: url)
             #expect(image != nil, "Could not load SVG as NSImage for \(slug)")
         }
+    }
+
+    @Test
+    func `provider brand icons resolve from SwiftPM module`() {
+        #expect(ProviderBrandIcon.image(for: .devin) != nil)
     }
 
     private static func repoRoot() throws -> URL {

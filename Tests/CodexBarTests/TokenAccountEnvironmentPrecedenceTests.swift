@@ -40,6 +40,22 @@ struct TokenAccountEnvironmentPrecedenceTests {
     }
 
     @Test
+    func `devin token account injects environment in app environment builder`() {
+        let settings = Self.makeSettingsStore(suite: "TokenAccountEnvironmentPrecedenceTests-devin-app")
+        settings.addTokenAccount(provider: .devin, label: "Account 1", token: "account-token")
+
+        let env = ProviderRegistry.makeEnvironment(
+            base: ["FOO": "bar"],
+            provider: .devin,
+            settings: settings,
+            tokenOverride: nil)
+
+        #expect(env["FOO"] == "bar")
+        #expect(env[DevinSettingsReader.apiKeyEnvironmentKey] == "account-token")
+        #expect(ProviderTokenResolver.devinToken(environment: env) == "account-token")
+    }
+
+    @Test
     func `token account environment overrides config API key in CLI environment builder`() throws {
         let config = CodexBarConfig(
             providers: [

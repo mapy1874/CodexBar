@@ -907,6 +907,7 @@ extension UsageStore {
                 .commandcode: "Command Code debug log not yet implemented",
                 .stepfun: "StepFun debug log not yet implemented",
                 .bedrock: "Bedrock debug log not yet implemented",
+                .devin: "Devin debug log not yet implemented",
             ]
             let buildText = {
                 switch provider {
@@ -979,7 +980,7 @@ extension UsageStore {
                         hasTokenAccount: deepSeekHasTokenAccount)
                 case .gemini, .antigravity, .opencode, .opencodego, .factory, .copilot, .vertexai, .kilo, .kiro, .kimi,
                      .kimik2, .moonshot, .jetbrains, .perplexity, .mimo, .doubao, .abacus, .mistral, .codebuff, .crof,
-                     .windsurf, .venice, .manus, .commandcode, .stepfun, .bedrock:
+                     .windsurf, .venice, .manus, .commandcode, .stepfun, .bedrock, .devin:
                     return unimplementedDebugLogMessages[provider] ?? "Debug log not yet implemented"
                 }
             }

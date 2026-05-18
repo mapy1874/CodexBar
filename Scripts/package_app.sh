@@ -166,6 +166,11 @@ generate_widget_appintents_metadata() {
     elapsed=$((elapsed + 1))
   done
   if ! wait "$xcodebuild_pid"; then
+    if [[ "${SIGNING_MODE:-}" == "adhoc" || "${CODEXBAR_ALLOW_MISSING_WIDGET_METADATA:-0}" == "1" ]]; then
+      echo "WARN: Failed to build CodexBarWidget metadata inputs; continuing without it." >&2
+      tail -80 "$xcodebuild_log" >&2 || true
+      return 0
+    fi
     echo "ERROR: Failed to build CodexBarWidget metadata inputs." >&2
     tail -80 "$xcodebuild_log" >&2 || true
     exit 1

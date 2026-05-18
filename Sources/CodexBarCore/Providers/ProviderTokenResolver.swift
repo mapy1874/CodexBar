@@ -81,6 +81,12 @@ public enum ProviderTokenResolver {
         self.perplexityResolution(environment: environment)?.token
     }
 
+    public static func devinToken(
+        environment: [String: String] = ProcessInfo.processInfo.environment) -> String?
+    {
+        self.devinResolution(environment: environment)?.token
+    }
+
     public static func deepseekToken(
         environment: [String: String] = ProcessInfo.processInfo.environment) -> String?
     {
@@ -119,6 +125,12 @@ public enum ProviderTokenResolver {
         environment: [String: String] = ProcessInfo.processInfo.environment) -> ProviderTokenResolution?
     {
         self.resolveEnv(BedrockSettingsReader.accessKeyID(environment: environment))
+    }
+
+    public static func devinResolution(
+        environment: [String: String] = ProcessInfo.processInfo.environment) -> ProviderTokenResolution?
+    {
+        self.resolveEnv(DevinSettingsReader.apiKey(environment: environment))
     }
 
     public static func deepseekResolution(
